@@ -246,6 +246,29 @@ public class clientui extends JFrame {
 
             serverWriter.println("LOGIN|" + myChatter.toProtocolString());
 
+            // kiem tra phan hoi tu server
+            try {
+                String response = serverReader.readLine();
+                if (response == null || response.startsWith("LOGIN_FAILED|")) {
+                    String reason = (response != null && response.contains("|")) ? response.substring(response.indexOf("|") + 1) : "Tên đã tồn tại!";
+                    try { p2pServerSocket.close(); } catch (Exception ignored) {}
+                    try { serverSocket.close(); } catch (Exception ignored) {}
+                    JOptionPane.showMessageDialog(dialog, reason, "Trùng Tên", JOptionPane.WARNING_MESSAGE);
+                    txtNick.requestFocusInWindow();
+                    txtNick.selectAll();
+                    return;
+                }
+
+                if (response.startsWith("INIT_LIST|")) {
+                    processServerSignal(response);
+                }
+            } catch (IOException ex) {
+                try { p2pServerSocket.close(); } catch (Exception ignored) {}
+                try { serverSocket.close(); } catch (Exception ignored) {}
+                JOptionPane.showMessageDialog(dialog, "Lỗi kết nối: " + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
             isLoggedIn = true;
             new Thread(new ServerListenerTask()).start();
             new Thread(new PeerListenerTask()).start();
@@ -313,6 +336,57 @@ public class clientui extends JFrame {
                (c.getIp().equals(myChatter.getIp()) && c.getPort() == myChatter.getPort());
     }
 
+    private void processServerSignal(String line) {
+        if (line.startsWith("INIT_LIST|")) {
+            String data = line.substring(10);
+            SwingUtilities.invokeLater(() -> {
+                listModel.clear();
+                if (!data.isEmpty()) {
+                    String[] items = data.split(";");
+                    for (String item : items) {
+                        chatter c = chatter.fromProtocolString(item);
+                        // chi lay nguoi khac
+                        if (c != null && !isSelf(c)) {
+                            listModel.addElement(c);
+                        }
+                    }
+                }
+                updateOnlineHeader();
+                if (!listModel.isEmpty() && lstChatters.getSelectedIndex() == -1) {
+                    lstChatters.setSelectedIndex(0);
+                }
+            });
+        } else if (line.startsWith("ADD_PEER|")) {
+            String data = line.substring(9);
+            chatter c = chatter.fromProtocolString(data);
+            if (c != null && !isSelf(c)) {
+                SwingUtilities.invokeLater(() -> {
+                    if (!listModel.contains(c)) {
+                        listModel.addElement(c);
+                        updateOnlineHeader();
+                        if (lstChatters.getSelectedIndex() == -1) {
+                            lstChatters.setSelectedIndex(0);
+                        }
+                    }
+                });
+                appendChatMessage("[Hệ thống]: '" + c.getNickname() + "' đã online.");
+            }
+        } else if (line.startsWith("REMOVE_PEER|")) {
+            String nickname = line.substring(12);
+            SwingUtilities.invokeLater(() -> {
+                for (int i = 0; i < listModel.size(); i++) {
+                    if (listModel.get(i).getNickname().equalsIgnoreCase(nickname)) {
+                        listModel.remove(i);
+                        updateOnlineHeader();
+                        break;
+                    }
+                }
+                updateChatWithTarget();
+            });
+            appendChatMessage("[Hệ thống]: '" + nickname + "' đã thoát.");
+        }
+    }
+
     // lang nghe server
     private class ServerListenerTask implements Runnable {
         @Override
@@ -327,57 +401,6 @@ public class clientui extends JFrame {
                     appendChatMessage("[Hệ thống]: Mất kết nối tới Central Server.");
                     SwingUtilities.invokeLater(() -> lblStatus.setText("Mất kết nối tới Server."));
                 }
-            }
-        }
-
-        private void processServerSignal(String line) {
-            if (line.startsWith("INIT_LIST|")) {
-                String data = line.substring(10);
-                SwingUtilities.invokeLater(() -> {
-                    listModel.clear();
-                    if (!data.isEmpty()) {
-                        String[] items = data.split(";");
-                        for (String item : items) {
-                            chatter c = chatter.fromProtocolString(item);
-                            // chi lay nguoi khac
-                            if (c != null && !isSelf(c)) {
-                                listModel.addElement(c);
-                            }
-                        }
-                    }
-                    updateOnlineHeader();
-                    if (!listModel.isEmpty() && lstChatters.getSelectedIndex() == -1) {
-                        lstChatters.setSelectedIndex(0);
-                    }
-                });
-            } else if (line.startsWith("ADD_PEER|")) {
-                String data = line.substring(9);
-                chatter c = chatter.fromProtocolString(data);
-                if (c != null && !isSelf(c)) {
-                    SwingUtilities.invokeLater(() -> {
-                        if (!listModel.contains(c)) {
-                            listModel.addElement(c);
-                            updateOnlineHeader();
-                            if (lstChatters.getSelectedIndex() == -1) {
-                                lstChatters.setSelectedIndex(0);
-                            }
-                        }
-                    });
-                    appendChatMessage("[Hệ thống]: '" + c.getNickname() + "' đã online.");
-                }
-            } else if (line.startsWith("REMOVE_PEER|")) {
-                String nickname = line.substring(12);
-                SwingUtilities.invokeLater(() -> {
-                    for (int i = 0; i < listModel.size(); i++) {
-                        if (listModel.get(i).getNickname().equalsIgnoreCase(nickname)) {
-                            listModel.remove(i);
-                            updateOnlineHeader();
-                            break;
-                        }
-                    }
-                    updateChatWithTarget();
-                });
-                appendChatMessage("[Hệ thống]: '" + nickname + "' đã thoát.");
             }
         }
     }

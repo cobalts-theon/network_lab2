@@ -164,11 +164,25 @@ public class serverui extends JFrame {
                 String data = message.substring(6);
                 chatter c = chatter.fromProtocolString(data);
                 if (c != null) {
+                    // kiem tra trung ten
+                    boolean exists = false;
+                    synchronized (onlineChatters) {
+                        for (chatter item : onlineChatters) {
+                            if (item.getNickname().equalsIgnoreCase(c.getNickname())) {
+                                exists = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (exists) {
+                        sendMessage("LOGIN_FAILED|Tên này đã có người sử dụng! Vui lòng chọn tên khác.");
+                        return;
+                    }
+
                     String remoteIp = socket.getInetAddress().getHostAddress();
                     if ("127.0.0.1".equals(c.getIp()) && !remoteIp.equals("127.0.0.1") && !remoteIp.equals("0:0:0:0:0:0:0:1")) {
                         c.setIp(remoteIp);
                     }
-                    onlineChatters.removeIf(item -> item.getNickname().equalsIgnoreCase(c.getNickname()));
                     this.currentChatter = c;
 
                     onlineChatters.add(c);
