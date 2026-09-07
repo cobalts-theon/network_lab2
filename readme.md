@@ -12,5 +12,6 @@ Bạn có thể chạy bằng lệnh `.sh` (chuẩn) hoặc gõ thẳng file `.b
 - Bật Client: Nhấp đúp vào `run_client.bat` (mở nhiều lần để tạo nhiều Peer)
 
 ## 3. Cách dùng
-- Mở Client: Nhập Tên và Cổng P2P (được tự động gợi ý) rồi bấm **Vào Chat**.
+- Mở Client: Pop-up chỉ yêu cầu nhập **Tên hiển thị** (IP và Cổng P2P được hệ thống tự động phát hiện và gán ngầm hoàn toàn).
+- Bấm **Vào Chat** (hoặc gõ **Enter**) để vào phòng chat.
 - Danh sách chỉ hiện người khác. Chọn người nhận và gửi tin nhắn P2P trực tiếp.

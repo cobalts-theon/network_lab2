@@ -142,7 +142,7 @@ public class clientui extends JFrame {
     private void updateChatWithTarget() {
         chatter selected = lstChatters.getSelectedValue();
         if (selected != null) {
-            lblChatWith.setText("Đang chat trực tiếp với: " + selected.getNickname() + " (" + selected.getIp() + ":" + selected.getPort() + ")");
+            lblChatWith.setText("Đang chat trực tiếp với: " + selected.getNickname());
             txtMessage.requestFocusInWindow();
         } else {
             lblChatWith.setText("Chọn 1 người trong danh sách online bên trái để chat");
@@ -180,32 +180,19 @@ public class clientui extends JFrame {
 
     public boolean showLoginDialog() {
         JDialog dialog = new JDialog((Frame) null, "Đăng Nhập Chat P2P", true);
-        dialog.setSize(380, 240);
+        dialog.setSize(340, 150);
         dialog.setLocationRelativeTo(null);
         dialog.setLayout(new BorderLayout(10, 10));
         dialog.setResizable(false);
 
-        JPanel panelFields = new JPanel(new GridLayout(4, 2, 8, 8));
-        panelFields.setBorder(new EmptyBorder(15, 20, 10, 20));
+        JPanel panelFields = new JPanel(new BorderLayout(5, 5));
+        panelFields.setBorder(new EmptyBorder(15, 20, 5, 20));
 
-        int suggestedPort = findAvailablePort(6001);
+        JTextField txtNick = new JTextField();
+        txtNick.setFont(new Font("SansSerif", Font.PLAIN, 13));
 
-        JTextField txtNick = new JTextField("Peer_" + (suggestedPort % 100));
-        JTextField txtPort = new JTextField(String.valueOf(suggestedPort));
-        JTextField txtSIp = new JTextField(serverIp);
-        JTextField txtSPort = new JTextField(String.valueOf(serverPort));
-
-        panelFields.add(new JLabel("Tên hiển thị:"));
-        panelFields.add(txtNick);
-
-        panelFields.add(new JLabel("Cổng P2P của bạn:"));
-        panelFields.add(txtPort);
-
-        panelFields.add(new JLabel("Server IP (mặc định):"));
-        panelFields.add(txtSIp);
-
-        panelFields.add(new JLabel("Server Port:"));
-        panelFields.add(txtSPort);
+        panelFields.add(new JLabel("Nhập tên hiển thị:"), BorderLayout.NORTH);
+        panelFields.add(txtNick, BorderLayout.CENTER);
 
         dialog.add(panelFields, BorderLayout.CENTER);
 
@@ -222,42 +209,31 @@ public class clientui extends JFrame {
 
         btnJoin.addActionListener(e -> {
             String nick = txtNick.getText().trim();
-            String sPort = txtPort.getText().trim();
-            String sHost = txtSIp.getText().trim();
-            String sSPort = txtSPort.getText().trim();
-
             if (nick.isEmpty()) {
                 JOptionPane.showMessageDialog(dialog, "Vui lòng nhập tên của bạn!", "Cảnh báo", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
-            int myPort;
-            int srvPort;
-            try {
-                myPort = Integer.parseInt(sPort);
-                srvPort = Integer.parseInt(sSPort);
-            } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dialog, "Cổng phải là số nguyên hợp lệ!", "Lỗi", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
+            // tu dong tim port kha dung
+            int myPort = findAvailablePort(6001);
 
             // mo port p2p
             try {
                 p2pServerSocket = new ServerSocket(myPort);
                 p2pServerSocket.setReuseAddress(true);
             } catch (IOException ex) {
-                JOptionPane.showMessageDialog(dialog, "Cổng P2P " + myPort + " đang bị chiếm dụng. Hãy đổi cổng khác!", "Cổng Bị Trùng", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(dialog, "Không thể mở cổng P2P!", "Lỗi", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
             // ket noi server
             try {
-                serverSocket = new Socket(sHost, srvPort);
+                serverSocket = new Socket(serverIp, serverPort);
                 serverReader = new BufferedReader(new InputStreamReader(serverSocket.getInputStream(), StandardCharsets.UTF_8));
                 serverWriter = new PrintWriter(new OutputStreamWriter(serverSocket.getOutputStream(), StandardCharsets.UTF_8), true);
             } catch (IOException ex) {
                 try { p2pServerSocket.close(); } catch (Exception ignored) {}
-                JOptionPane.showMessageDialog(dialog, "Không thể kết nối đến Server tại " + sHost + ":" + srvPort + "!\nHãy bật Server trước khi mở Client.", "Lỗi Kết Nối Server", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(dialog, "Không thể kết nối đến Server trung tâm!\nHãy đảm bảo Server đã được bật.", "Lỗi Kết Nối", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
@@ -266,8 +242,6 @@ public class clientui extends JFrame {
             if (myIp == null || myIp.isEmpty() || myIp.equals("0.0.0.0")) {
                 myIp = "127.0.0.1";
             }
-            this.serverIp = sHost;
-            this.serverPort = srvPort;
             this.myChatter = new chatter(nick, myIp, myPort);
 
             serverWriter.println("LOGIN|" + myChatter.toProtocolString());
@@ -276,9 +250,9 @@ public class clientui extends JFrame {
             new Thread(new ServerListenerTask()).start();
             new Thread(new PeerListenerTask()).start();
 
-            lblUserHeader.setText("Bạn: " + myChatter.getNickname() + "  |  IP: " + myChatter.getIp() + "  |  Port: " + myChatter.getPort());
-            setTitle("P2P Hybrid Chat - " + myChatter.getNickname() + " (" + myChatter.getPort() + ")");
-            lblStatus.setText("Đã kết nối Server: " + serverIp + ":" + serverPort);
+            lblUserHeader.setText("Bạn: " + myChatter.getNickname());
+            setTitle("P2P Hybrid Chat - " + myChatter.getNickname());
+            lblStatus.setText("Sẵn sàng chat.");
 
             success[0] = true;
             dialog.dispose();
@@ -288,16 +262,14 @@ public class clientui extends JFrame {
             dialog.dispose();
         });
 
-        KeyAdapter enterSubmit = new KeyAdapter() {
+        txtNick.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     btnJoin.doClick();
                 }
             }
-        };
-        txtNick.addKeyListener(enterSubmit);
-        txtPort.addKeyListener(enterSubmit);
+        });
 
         dialog.setVisible(true);
         return success[0];
